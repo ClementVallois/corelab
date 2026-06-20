@@ -1,13 +1,28 @@
 {
+  "name": "CoreLab",
+  "workspaces": [
+    "packages/*",
+    "services/*"
+  ],
+  "scripts": {
+    "migrate:create": "node-pg-migrate create -j sql",
+    "migrate:accounts": "node-pg-migrate -m services/accounts/migrations -t pgmigrations_accounts --envPath .env",
+    "migrate:compliance": "node-pg-migrate -m services/compliance/migrations -t pgmigrations_compliance --envPath .env",
+    "migrate:up": "npm run migrate:accounts -- up && npm run migrate:compliance -- up",
+    "migrate:down": "npm run migrate:compliance -- down && npm run migrate:accounts -- down"
+  },
   "type": "module",
   "devDependencies": {
     "@types/node": "^25.9.3",
+    "dotenv": "^17.4.2",
     "typescript": "^6.0.3"
   },
   "dependencies": {
     "@fastify/sensible": "^6.0.4",
     "fastify": "^5.8.5",
     "fastify-plugin": "^6.0.0",
-    "ioredis": "^5.11.1"
+    "ioredis": "^5.11.1",
+    "node-pg-migrate": "^8.0.4",
+    "pg": "^8.22.0"
   }
 }
