@@ -11,13 +11,17 @@ class AppError extends Error {
   }
 }
 
-function errorHandler(error: Error, req: FastifyRequest, reply: FastifyReply) {
+function errorHandler(
+  error: Error,
+  request: FastifyRequest,
+  reply: FastifyReply,
+) {
   if (error instanceof AppError) {
     return reply
       .status(error.statusCode)
       .send({ error: { code: error.code, message: error.message } });
   } else {
-    req.log.error(error);
+    request.log.error(error);
     reply
       .status(500)
       .send({ error: { code: "INTERNAL", message: "Internal Server Error" } });

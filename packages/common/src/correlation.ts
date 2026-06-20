@@ -3,14 +3,14 @@ import fastifyPlugin from "fastify-plugin";
 import { randomUUID } from "node:crypto";
 import { IncomingMessage } from "node:http";
 
-export function genCorrelationId(req: IncomingMessage) {
-  const header = req.headers["x-correlation-id"];
+export function genCorrelationId(request: IncomingMessage) {
+  const header = request.headers["x-correlation-id"];
   return (typeof header === "string" ? header : undefined) ?? randomUUID();
 }
 
 async function _correlationPlugin(app: FastifyInstance) {
-  app.addHook("onRequest", async (req, reply) => {
-    reply.header("x-correlation-id", req.id);
+  app.addHook("onRequest", async (request, reply) => {
+    reply.header("x-correlation-id", request.id);
   });
 }
 
