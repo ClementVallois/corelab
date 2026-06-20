@@ -1,0 +1,11 @@
+{
+  "name": "@corelab/accounts",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "test": "node --import tsx --test"
+  },
+  "dependencies": {
+    "@corelab/common": "*"
+  }
+}
