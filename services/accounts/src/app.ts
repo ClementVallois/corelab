@@ -1,8 +1,17 @@
-import { correlationPlugin, createLogger, errorHandler } from "@corelab/common";
+import {
+  correlationPlugin,
+  createLogger,
+  errorHandler,
+  genCorrelationId,
+} from "@corelab/common";
 import Fastify from "fastify";
 
 function buildApp() {
-  const app = Fastify({ loggerInstance: createLogger("accounts") });
+  const app = Fastify({
+    loggerInstance: createLogger("accounts"),
+    genReqId: genCorrelationId,
+    requestIdLogLabel: "correlationId",
+  });
   app.setErrorHandler(errorHandler);
   app.register(correlationPlugin);
   app.get("/health", async () => ({
