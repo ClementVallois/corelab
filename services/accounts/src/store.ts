@@ -1,5 +1,6 @@
 import { Pool } from "pg";
 import argon2 from "argon2";
+import { AppError } from "@corelab/common";
 
 export type User = { id: string; email: string };
 export type UserWithHash = User & { passwordHash: string };
@@ -21,12 +22,23 @@ export interface Deps {
 export function pgUserStore(pool: Pool): UserStore {
   return {
     async createUser(email, passwordHash) {
-      const { rows } = await pool.query(
-        `INSERT INTO users (email, password_hash)
+      try {
+        const { rows } = await pool.query(
+          `INSERT INTO users (email, password_hash)
         VALUES ($1, $2) RETURNING id, email`,
-        [email, passwordHash],
-      );
-      return rows[0];
+          [email, passwordHash],
+        );
+        return rows[0];
+      } catch (err: any) {
+        if (err.code === "23505") {
+          throw new AppError(
+            409,
+            "EMAIL_ALREADY_TAKEN",
+            "Email already registered",
+          );
+        }
+        throw err;
+      }
     },
 
     async findUserByEmail(email) {
