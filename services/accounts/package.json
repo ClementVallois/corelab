@@ -6,6 +6,7 @@
     "test": "node --import tsx --test"
   },
   "dependencies": {
-    "@corelab/common": "*"
+    "@corelab/common": "*",
+    "ioredis": "^5.11.1"
   }
 }
