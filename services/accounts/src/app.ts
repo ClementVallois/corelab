@@ -1,4 +1,5 @@
 import {
+  AppError,
   correlationPlugin,
   createLogger,
   errorHandler,
@@ -7,6 +8,7 @@ import {
 import Fastify from "fastify";
 import { Type, Static } from "typebox";
 import { Deps } from "./store.js";
+import { randomUUID } from "node:crypto";
 
 const RegisterBodySchema = Type.Object(
   {
@@ -56,8 +58,12 @@ function buildApp(deps: Deps) {
         },
         async (request, reply) => {
           const { email, password } = request.body;
+          const normalizedEmail = email.trim().toLocaleLowerCase();
           const passwordHash = await deps.hasher.hash(password);
-          const user = await deps.store.createUser(email, passwordHash);
+          const user = await deps.store.createUser(
+            normalizedEmail,
+            passwordHash,
+          );
 
           return reply.status(201).send({ id: user.id, email: user.email });
         },
@@ -71,6 +77,25 @@ function buildApp(deps: Deps) {
         },
         async (request, reply) => {
           const { email, password } = request.body;
+          const normalizedEmail = email.trim().toLocaleLowerCase();
+          const user = await deps.store.findUserByEmail(normalizedEmail);
+          if (
+            !user ||
+            !(await deps.hasher.verify(password, user.passwordHash))
+          ) {
+            throw new AppError(
+              401,
+              "INVALID_CREDENTIALS",
+              "Invalid credentials",
+            );
+          }
+          const sid = randomUUID();
+          await deps.session.createSession(
+            sid,
+            user.id,
+            "204.183.192.32",
+            Date.now(),
+          );
         },
       );
     },

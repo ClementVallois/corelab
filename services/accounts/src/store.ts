@@ -11,7 +11,7 @@ export type Session = {
   sid: string;
   userId: string;
   ip: string;
-  createdAt: string;
+  createdAt: number;
 };
 
 export interface UserStore {
@@ -28,7 +28,7 @@ export interface SessionStore {
     sid: string,
     userId: string,
     ip: string,
-    createdAt: string,
+    createdAt: number,
   ): Promise<Session>;
   getSession(sid: string): Promise<Session | null>;
   deleteSession(sid: string): Promise<void>;
