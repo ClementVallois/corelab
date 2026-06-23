@@ -16,7 +16,7 @@ export type Session = {
 
 export interface UserStore {
   createUser(email: string, passwordHash: string): Promise<User>;
-  findUserByEmail(email: string): Promise<UserWithHash>;
+  findUserByEmail(email: string): Promise<UserWithHash | null>;
 }
 export interface Hasher {
   hash(plain: string): Promise<string>;
@@ -44,7 +44,7 @@ export interface Deps {
 
 export function pgUserStore(pool: Pool): UserStore {
   return {
-    async createUser(email, passwordHash) {
+    async createUser(email, passwordHash): Promise<User> {
       try {
         const { rows } = await pool.query(
           `INSERT INTO users (email, password_hash)
@@ -64,7 +64,7 @@ export function pgUserStore(pool: Pool): UserStore {
       }
     },
 
-    async findUserByEmail(email) {
+    async findUserByEmail(email): Promise<UserWithHash | null> {
       const { rows } = await pool.query(
         `SELECT id, email, password_hash as "passwordHash"
         FROM users where email = $1`,
@@ -82,21 +82,52 @@ export const argon2Hasher: Hasher = {
 
 export function sessionStore(redis: Redis): SessionStore {
   return {
-    async createSession(sid, userId, ip, createdAt) {
+    async createSession(sid, userId, ip, createdAt): Promise<Session> {
       const results = await redis
         .multi()
         .hset(`session:${sid}`, { userId, ip, createdAt })
         .expire(`session:${sid}`, SESSION_TTL)
-        .sadd(`user:${userId}:sessions`, sid)
+        .zadd(`user:${userId}:sessions`, Date.now() + SESSION_TTL * 1000, sid)
         .exec();
       if (!results) {
         throw new Error("Transaction aborted");
       }
       return { sid, userId, ip, createdAt };
     },
-    async getSession() {},
-    async deleteSession() {},
-    async listForUser() {},
-    async deleteAllForUser() {},
+    async getSession(sid: string): Promise<Session | null> {
+      const results = await redis.hgetall(`session:${sid}`);
+
+      if (Object.keys(results).length === 0) {
+        return null;
+      }
+      const { userId, ip, createdAt } = results;
+      return { sid, userId, ip, createdAt: Number(createdAt) };
+    },
+    async deleteSession(sid: string): Promise<void> {
+      const userId = await redis.hget(`session:${sid}`, "userId");
+      const deleteTransaction = redis.multi().del(`session:${sid}`);
+      if (userId) {
+        deleteTransaction.zrem(`user:${userId}:sessions`, sid);
+      }
+      await deleteTransaction.exec();
+    },
+    async listForUser(userId: string): Promise<Session[]> {
+      await redis.zremrangebyscore(`user:${userId}:sessions`, 0, Date.now());
+      const sids = await redis.zrange(`user:${userId}:sessions`, 0, -1);
+      const sessions = await Promise.all(
+        sids.map((sid) => this.getSession(sid)),
+      );
+
+      return sessions.filter((s): s is Session => s !== null);
+    },
+    async deleteAllForUser(userId: string): Promise<void> {
+      const sids = await redis.zrange(`user:${userId}:sessions`, 0, -1);
+      const deleteTransaction = redis.multi();
+      for (const sid of sids) {
+        deleteTransaction.del(`session:${sid}`);
+      }
+      deleteTransaction.del(`user:${userId}:sessions`);
+      await deleteTransaction.exec();
+    },
   };
 }
