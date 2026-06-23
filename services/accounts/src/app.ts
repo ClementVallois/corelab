@@ -10,7 +10,7 @@ import { Type, Static } from "typebox";
 import { Deps } from "./store.js";
 import { randomUUID } from "node:crypto";
 
-const RegisterBodySchema = Type.Object(
+const AuthBodySchema = Type.Object(
   {
     email: Type.String({ format: "email" }),
     password: Type.String({ minLength: 8, maxLength: 200 }),
@@ -18,22 +18,11 @@ const RegisterBodySchema = Type.Object(
   { additionalProperties: false },
 );
 
-const LoginBodySchema = Type.Object(
-  {
-    email: Type.String({ format: "email" }),
-    password: Type.String({ minLength: 8, maxLength: 200 }),
-  },
-  { additionalProperties: false },
-);
+type AuthBody = Static<typeof AuthBodySchema>;
 
-const UserResponseSchema = Type.Object({
-  id: Type.String(),
-  email: Type.String(),
-});
-
-type RegisterBody = Static<typeof RegisterBodySchema>;
-
-type LoginBody = Static<typeof LoginBodySchema>;
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
 
 function buildApp(deps: Deps) {
   const app = Fastify({
@@ -49,16 +38,16 @@ function buildApp(deps: Deps) {
 
   app.register(
     async (v1) => {
-      v1.post<{ Body: RegisterBody }>(
+      v1.post<{ Body: AuthBody }>(
         "/register",
         {
           schema: {
-            body: RegisterBodySchema,
+            body: AuthBodySchema,
           },
         },
         async (request, reply) => {
           const { email, password } = request.body;
-          const normalizedEmail = email.trim().toLocaleLowerCase();
+          const normalizedEmail = normalizeEmail(email);
           const passwordHash = await deps.hasher.hash(password);
           const user = await deps.store.createUser(
             normalizedEmail,
@@ -68,16 +57,16 @@ function buildApp(deps: Deps) {
           return reply.status(201).send({ id: user.id, email: user.email });
         },
       );
-      v1.post<{ Body: LoginBody }>(
+      v1.post<{ Body: AuthBody }>(
         "/login",
         {
           schema: {
-            body: LoginBodySchema,
+            body: AuthBodySchema,
           },
         },
         async (request, reply) => {
           const { email, password } = request.body;
-          const normalizedEmail = email.trim().toLocaleLowerCase();
+          const normalizedEmail = normalizeEmail(email);
           const user = await deps.store.findUserByEmail(normalizedEmail);
           if (
             !user ||
@@ -93,9 +82,10 @@ function buildApp(deps: Deps) {
           await deps.session.createSession(
             sid,
             user.id,
-            "204.183.192.32",
+            request.ip,
             Date.now(),
           );
+          return reply.status(200).send({ sessionId: sid });
         },
       );
     },
