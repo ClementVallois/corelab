@@ -88,6 +88,18 @@ function buildApp(deps: Deps) {
           return reply.status(200).send({ sessionId: sid });
         },
       );
+      v1.post("/logout", {}, async (request, reply) => {
+        const auth = request.headers.authorization;
+        if (!auth) {
+          throw new AppError(401, "UNAUTHORIZED", "Unauthorized");
+        }
+        const sid = auth.startsWith("Bearer ") ? auth.slice(7) : null;
+        if (!sid) {
+          throw new AppError(401, "UNAUTHORIZED", "Unauthorized");
+        }
+        await deps.session.deleteSession(sid);
+        return reply.code(204).send();
+      });
     },
     { prefix: "/api/v1" },
   );
